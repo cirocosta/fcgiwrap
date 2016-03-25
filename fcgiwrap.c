@@ -191,6 +191,7 @@ struct fcgi_context {
 	int fd_stderr;
 	unsigned int reply_state;
 	pid_t cgi_pid;
+	int unbuffered;
 };
 
 static void fcgi_finish(struct fcgi_context *fc, const char* msg)
@@ -255,6 +256,10 @@ out_of_loop:
 			if (FCGI_fwrite(p, 1, buf + nread - p, ffp) != (size_t)(buf + nread - p)) {
 				return "writing CGI reply";
 			}
+		}
+
+		if (fc->unbuffered) {
+			FCGI_fflush(ffp);
 		}
 	} else {
 		if (nread < 0) {
@@ -590,6 +595,13 @@ static void handle_fcgi_request(void)
 			fc.fd_stderr = pipe_err[0];
 			fc.reply_state = REPLY_STATE_INIT;
 			fc.cgi_pid = pid;
+
+			p = getenv("NO_BUFFERING");
+			if (p) {
+				fc.unbuffered = 1;
+			} else {
+				fc.unbuffered = 0;
+			}
 
 			fcgi_pass(&fc);
 	}
